@@ -125,17 +125,22 @@ def backtest_pair(
 
     spread = kalman_result.spread.copy()
     beta = kalman_result.beta_series.copy()
-    sigma = kalman_result.spread_std
+    sigma_global = kalman_result.spread_std
 
-    if sigma <= 0:
+    if sigma_global <= 0:
         # Degenerate filter; no trades.
         return BacktestResult(pair=pair_name, trades=[], daily_pnl=None,
                               burn_in_days=burn_in_days)
 
-    entry_threshold = entry_sigma * sigma
-    # Cost as a fraction. 10 bps = 0.001; total round-trip per leg = 2 * 0.001.
-    # We have 2 legs per trade, so total cost per trade = 4 * (bps / 10000) * notional.
-    # But each leg is $1 notional, so:
+    # Rolling 60-day std of the spread, computed from past innovations only.
+    # The .shift(1) ensures the std at time t uses only innovations through t-1,
+    # preventing look-ahead bias. Adapts to changing volatility, which is what
+    # production pairs strategies do. We fill the early NaN values (before the
+    # rolling window is full) with the post-warmup global sigma from kalman.py.
+    rolling_sigma = spread.rolling(window=60, min_periods=30).std().shift(1)
+    rolling_sigma = rolling_sigma.fillna(sigma_global)
+
+    # Cost as a fraction. Two legs per trade, entry + exit:
     cost_per_trade = 4.0 * (cost_bps_per_leg / 10000.0)
 
     # Align price data with the spread series.
@@ -161,6 +166,8 @@ def backtest_pair(
         date = spread.index[i]
         s = spread.iloc[i]
         b = beta.iloc[i]
+        sig_t = rolling_sigma.iloc[i]
+        entry_threshold = entry_sigma * sig_t
         py = pair_prices[y].iloc[i]
         px = pair_prices[x].iloc[i]
 

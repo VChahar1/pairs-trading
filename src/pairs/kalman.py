@@ -164,7 +164,11 @@ def fit_kalman_pair(
         name="spread",
     )
 
-    spread_std = float(innovations.std())
+    WARMUP = 30
+    if len(innovations) > WARMUP + 30:
+        spread_std = float(innovations.iloc[WARMUP:].std())
+    else:
+        spread_std = float(innovations.std())
 
     return KalmanResult(
         y=y_ticker,
