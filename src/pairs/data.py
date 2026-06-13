@@ -28,13 +28,7 @@ def download_prices(
     end: str = END_DATE,
     use_cache: bool = True,
 ) -> pd.DataFrame:
-    """Download adjusted close prices for `tickers`.
-
-    Returns a DataFrame indexed by date with one column per ticker.
-
-    If `use_cache` is True and the cached file exists, loads from cache
-    instead of downloading. Pass `use_cache=False` to force re-download.
-    """
+    
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     cache_path = RAW_DIR / "prices.parquet"
 
@@ -69,34 +63,20 @@ def download_prices(
 
 
 def compute_log_returns(prices: pd.DataFrame) -> pd.DataFrame:
-    """Compute daily log returns from a price DataFrame.
-
-    Log returns are preferred over simple returns because they're additive
-    across time and approximately normal for small returns.
-    """
+    
     return (prices / prices.shift(1)).apply(lambda x: x.dropna()).pipe(
         lambda df: df  # placeholder to keep the chain explicit; computed below
     )
 
 
 def compute_log_returns(prices: pd.DataFrame) -> pd.DataFrame:
-    """Compute daily log returns from a price DataFrame.
-
-    Log returns are preferred over simple returns: they're additive across
-    time, approximately normal for small returns, and the standard choice
-    in quantitative finance research.
-    """
+    
     import numpy as np
     return np.log(prices / prices.shift(1)).dropna(how="all")
 
 
 def check_data_quality(prices: pd.DataFrame) -> dict:
-    """Run basic data-hygiene checks. Returns a summary dict.
-
-    Checks for: missing dates, missing values per ticker, suspiciously
-    constant prices (delisting), and stale prices (price unchanged for
-    many consecutive days).
-    """
+    
     summary: dict = {}
 
     # 1. Date range
