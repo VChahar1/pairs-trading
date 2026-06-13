@@ -22,25 +22,7 @@ from statsmodels.tsa.stattools import coint
 
 @dataclass(frozen=True)
 class CointResult:
-    """Result of an Engle-Granger cointegration test on one pair.
-
-    Attributes
-    ----------
-    y, x : str
-        Ticker symbols. The convention is Y = beta * X + alpha + spread,
-        so the regression is Y regressed on X.
-    p_value : float
-        p-value from the augmented Dickey-Fuller test on the residuals.
-        Lower means stronger evidence of cointegration. Standard threshold
-        is 0.05 before multiple-testing correction.
-    t_stat : float
-        Test statistic from the ADF test. More negative = stronger evidence
-        against the unit-root null.
-    critical_values : tuple[float, float, float]
-        Critical values at the 1%, 5%, and 10% levels for context.
-    n_obs : int
-        Number of observations used in the test.
-    """
+    
     y: str
     x: str
     p_value: float
@@ -50,10 +32,7 @@ class CointResult:
 
 
 def coint_test(prices: pd.DataFrame, y_ticker: str, x_ticker: str) -> CointResult:
-    """Run the Engle-Granger cointegration test on a single pair.
-
-    Drops dates where either series is missing before testing.
-    """
+    
     pair = prices[[y_ticker, x_ticker]].dropna()
     if len(pair) < 30:
         # Too few observations to test meaningfully.
@@ -80,17 +59,7 @@ def all_pairs_coint(
     prices: pd.DataFrame,
     tickers: list[str] | None = None,
 ) -> pd.DataFrame:
-    """Run cointegration tests on every unordered pair in `tickers`.
-
-    Returns a DataFrame sorted by ascending p_value (most cointegrated first).
-    Each row has columns: y, x, p_value, t_stat, crit_1pct, crit_5pct,
-    crit_10pct, n_obs.
-
-    Convention: for a pair (A, B) with A < B alphabetically, we test with
-    y=A, x=B. This makes the ordering deterministic and the results
-    reproducible. (Cointegration testing is mildly direction-dependent;
-    fixing the direction keeps the results clean.)
-    """
+    
     if tickers is None:
         tickers = list(prices.columns)
     tickers = sorted(tickers)
@@ -116,24 +85,11 @@ def all_pairs_coint(
 
 
 def bonferroni_threshold(n_tests: int, alpha: float = 0.05) -> float:
-    """Bonferroni-corrected significance threshold.
-
-    With n_tests independent tests at family-wise error rate alpha, each
-    individual test must have p < alpha / n_tests to be considered significant.
-    Very conservative.
-    """
-    return alpha / n_tests
+    conservative.
+     return alpha / n_tests
 
 
 def benjamini_hochberg(p_values: pd.Series, alpha: float = 0.05) -> pd.Series:
-    """Benjamini-Hochberg FDR-adjusted p-values.
-
-    Controls the expected proportion of false discoveries at level alpha,
-    which is less conservative than Bonferroni when many true positives exist.
-
-    Returns a Series of adjusted p-values (same index as input). A test is
-    significant at FDR alpha if its adjusted p-value < alpha.
-    """
     p = p_values.dropna().sort_values()
     n = len(p)
     # BH adjustment: p_adj[i] = min over k>=i of (p[k] * n / (k+1))
