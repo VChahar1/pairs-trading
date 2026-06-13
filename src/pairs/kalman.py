@@ -1,23 +1,4 @@
 """Kalman-filter estimation of time-varying hedge ratios.
-
-For each candidate pair (Y, X), we model:
-
-  State:        [beta_t, alpha_t]  evolves as a random walk
-  Observation:  log(Y_t) = beta_t * log(X_t) + alpha_t + noise
-
-This gives us at each time t:
-  - The best estimate of the hedge ratio beta_t
-  - The implied dynamic spread (the filter's innovation series)
-  - The innovation standard deviation, used later for trading thresholds
-
-The dynamic spread is the analog of the static OLS residual but allows
-the hedge ratio to drift. If the static OLS spread looks non-stationary
-because beta is drifting, the Kalman innovations should look stationary.
-
-We use statsmodels' state-space framework for the implementation. The
-process noise (Q) and observation noise (R) are estimated by maximum
-likelihood. Some pairs may not yield well-identified estimates; we
-flag those.
 """
 
 from __future__ import annotations
@@ -31,31 +12,7 @@ from statsmodels.tsa.statespace.mlemodel import MLEModel
 
 @dataclass
 class KalmanResult:
-    """Output of a Kalman-filter fit on one pair.
 
-    Attributes
-    ----------
-    y, x : str
-        Ticker symbols. The relationship modeled is log(Y) = beta * log(X) + alpha.
-    beta_series : pd.Series
-        Time-varying hedge ratio, indexed by date.
-    alpha_series : pd.Series
-        Time-varying intercept, indexed by date.
-    spread : pd.Series
-        Dynamic spread (the Kalman filter's one-step-ahead innovations),
-        indexed by date. This is the series we'll trade in Day 4.
-    spread_std : float
-        Estimated standard deviation of the innovations. Used to
-        compute trading thresholds (e.g., enter at ±2 sigma).
-    q_estimated : float
-        Estimated process-noise variance (the random-walk variance of beta).
-    r_estimated : float
-        Estimated observation-noise variance.
-    converged : bool
-        Whether the MLE optimizer converged.
-    log_likelihood : float
-        Log-likelihood of the fitted model. Higher is better fit.
-    """
     y: str
     x: str
     beta_series: pd.Series
@@ -69,15 +26,6 @@ class KalmanResult:
 
 
 class _PairsKalman(MLEModel):
-    """State-space model: hedge ratio + intercept as random-walk states.
-
-    State vector: [beta_t, alpha_t]
-    Observation: log(Y_t) = beta_t * log(X_t) + alpha_t + noise
-
-    The MLE machinery in statsmodels takes care of running the Kalman
-    filter forward and computing the log-likelihood. We just have to
-    set up the matrices correctly.
-    """
 
     def __init__(self, log_y: np.ndarray, log_x: np.ndarray):
         # Pass observations to the parent. k_states=2 (beta and alpha).
@@ -132,10 +80,6 @@ def fit_kalman_pair(
     y_ticker: str,
     x_ticker: str,
 ) -> KalmanResult:
-    """Fit a Kalman filter to one pair and return the dynamic spread.
-
-    Uses log prices throughout. Estimates Q and R by maximum likelihood.
-    """
     pair = prices[[y_ticker, x_ticker]].dropna()
     if len(pair) < 100:
         raise ValueError(
@@ -185,11 +129,6 @@ def fit_kalman_pair(
 
 
 def adf_pvalue(series: pd.Series) -> float:
-    """Augmented Dickey-Fuller p-value on a series.
-
-    Used to test whether the dynamic spread is stationary, which is the
-    natural follow-up question after fitting the Kalman model.
-    """
     from statsmodels.tsa.stattools import adfuller
     series = series.dropna()
     if len(series) < 30:
