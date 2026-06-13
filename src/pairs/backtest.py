@@ -1,17 +1,3 @@
-"""Backtest a pairs-trading strategy on Kalman-filtered spreads.
-
-Trading rule:
-  - Enter long-spread (long Y, short beta*X) when spread < -k*sigma
-  - Enter short-spread (short Y, long beta*X) when spread > +k*sigma
-  - Exit when the spread returns to zero (crosses to opposite side of mean)
-  - Position sizing: $1 notional per leg
-  - Transaction costs applied on entry and exit, per leg
-
-All signals computed using only past data (Kalman filter uses filtered
-estimates, not smoothed). Burn-in period at the start of the series gives
-the filter time to stabilize before we count trades.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
