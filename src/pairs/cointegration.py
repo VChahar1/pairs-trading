@@ -3,11 +3,6 @@
 Implements the Engle-Granger two-step procedure:
   1. OLS regression to find the hedge ratio: Y_t = beta * X_t + alpha + eps_t
   2. Augmented Dickey-Fuller test on the residuals for stationarity
-
-Pairs whose residuals reject the unit-root null are flagged as cointegrated.
-
-We also compute multiple-testing corrections (Bonferroni and Benjamini-Hochberg)
-because with 435 possible pairs, ~22 will pass at p<0.05 by chance alone.
 """
 
 from __future__ import annotations
