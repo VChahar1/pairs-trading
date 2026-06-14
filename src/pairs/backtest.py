@@ -85,26 +85,6 @@ def backtest_pair(
     burn_in_days: int = 252,
 ) -> BacktestResult:
     """Run a backtest on one pair.
-
-    Parameters
-    ----------
-    kalman_result : KalmanResult
-        Output of fit_kalman_pair, providing the dynamic spread and beta series.
-    prices : pd.DataFrame
-        Full price DataFrame (used to compute leg P&L from price changes).
-    entry_sigma : float
-        Enter a position when |spread| exceeds this many standard deviations.
-    cost_bps_per_leg : float
-        Round-trip transaction cost per leg, in basis points. 10 bps = 0.001.
-        Total cost per trade is 2 * cost_bps_per_leg * notional (two legs).
-    burn_in_days : int
-        Number of initial days during which the Kalman filter is warming up;
-        no trades are entered during this period.
-
-    Returns
-    -------
-    BacktestResult
-        Trades and daily mark-to-market P&L.
     """
     y, x = kalman_result.y, kalman_result.x
     pair_name = f"{y}/{x}"
@@ -118,11 +98,6 @@ def backtest_pair(
         return BacktestResult(pair=pair_name, trades=[], daily_pnl=None,
                               burn_in_days=burn_in_days)
 
-    # Rolling 60-day std of the spread, computed from past innovations only.
-    # The .shift(1) ensures the std at time t uses only innovations through t-1,
-    # preventing look-ahead bias. Adapts to changing volatility, which is what
-    # production pairs strategies do. We fill the early NaN values (before the
-    # rolling window is full) with the post-warmup global sigma from kalman.py.
     rolling_sigma = spread.rolling(window=60, min_periods=30).std().shift(1)
     rolling_sigma = rolling_sigma.fillna(sigma_global)
 
