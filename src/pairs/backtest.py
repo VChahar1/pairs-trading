@@ -12,16 +12,16 @@ from .kalman import KalmanResult
 class Trade:
     """A single completed round-trip trade."""
     pair: str
-    direction: int          # +1 = long-spread, -1 = short-spread
+    direction: int          
     entry_date: pd.Timestamp
     exit_date: pd.Timestamp
     entry_spread: float
     exit_spread: float
     entry_beta: float
     n_bars_held: int
-    gross_pnl: float        # before costs
-    cost: float             # transaction cost (round-trip, both legs)
-    net_pnl: float          # gross - cost
+    gross_pnl: float       
+    cost: float            
+    net_pnl: float         
 
 
 @dataclass
