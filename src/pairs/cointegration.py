@@ -80,8 +80,8 @@ def all_pairs_coint(
 
 
 def bonferroni_threshold(n_tests: int, alpha: float = 0.05) -> float:
-    conservative.
-     return alpha / n_tests
+    # Conservative Bonferroni correction.
+    return alpha / n_tests
 
 
 def benjamini_hochberg(p_values: pd.Series, alpha: float = 0.05) -> pd.Series:

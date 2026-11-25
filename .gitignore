@@ -10,3 +10,12 @@ data/cache/
 *.parquet
 *.csv
 .DS_Store
+
+# Local credentials and generated Python artifacts
+.env
+.env.*
+!.env.example
+*credentials*
+*.pem
+*.key
+*.pkl
