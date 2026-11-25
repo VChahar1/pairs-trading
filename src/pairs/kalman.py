@@ -1,5 +1,4 @@
-"""Kalman-filter estimation of time-varying hedge ratios.
-"""
+"""Kalman-filter estimation of time-varying hedge ratios."""
 
 from __future__ import annotations
 
@@ -12,7 +11,6 @@ from statsmodels.tsa.statespace.mlemodel import MLEModel
 
 @dataclass
 class KalmanResult:
-
     y: str
     x: str
     beta_series: pd.Series
@@ -26,29 +24,23 @@ class KalmanResult:
 
 
 class _PairsKalman(MLEModel):
-
     def __init__(self, log_y: np.ndarray, log_x: np.ndarray):
-        # Pass observations to the parent. k_states=2 (beta and alpha).
+
         super().__init__(
             endog=log_y,
             k_states=2,
-            initialization="approximate_diffuse",  # flat prior on initial state
+            initialization="approximate_diffuse",
         )
 
-        # The observation design matrix is time-varying: [log(X_t), 1]
-        # statsmodels expects shape (n_endog, k_states, nobs) for time-varying.
         design = np.zeros((1, 2, len(log_y)))
-        design[0, 0, :] = log_x   # multiplies beta
-        design[0, 1, :] = 1.0     # multiplies alpha
+        design[0, 0, :] = log_x
+        design[0, 1, :] = 1.0
         self["design"] = design
 
-        # State transition: identity (random walk for both states).
         self["transition"] = np.eye(2)
         self["selection"] = np.eye(2)
 
-        # Observation noise (R) and state noise covariance (Q) are
-        # parameters to be estimated. Initialize to placeholders.
-        self["obs_cov"]   = np.array([[1.0]])
+        self["obs_cov"] = np.array([[1.0]])
         self["state_cov"] = np.eye(2)
 
     @property
@@ -57,19 +49,19 @@ class _PairsKalman(MLEModel):
 
     @property
     def start_params(self):
-        # Reasonable starting values for the MLE optimization.
+
         return np.array([1e-4, 1e-6, 1e-6])
 
     def transform_params(self, unconstrained):
-        # All variances must be positive; we optimize over log-space.
-        return unconstrained ** 2
+
+        return unconstrained**2
 
     def untransform_params(self, constrained):
         return np.sqrt(constrained)
 
     def update(self, params, **kwargs):
         params = super().update(params, **kwargs)
-        # params are [sigma2_obs, sigma2_beta, sigma2_alpha]
+
         self["obs_cov", 0, 0] = params[0]
         self["state_cov", 0, 0] = params[1]
         self["state_cov", 1, 1] = params[2]
@@ -93,15 +85,10 @@ def fit_kalman_pair(
     model = _PairsKalman(log_y, log_x)
     fit = model.fit(disp=False, maxiter=200)
 
-    # Extract the smoothed state estimates. We use the FILTERED estimates
-    # (one-sided, only past data), not smoothed (uses future data too),
-    # because trading decisions can only use past data.
-    filtered_state = fit.filtered_state            # shape (2, n)
-    beta_series  = pd.Series(filtered_state[0], index=pair.index, name="beta")
+    filtered_state = fit.filtered_state
+    beta_series = pd.Series(filtered_state[0], index=pair.index, name="beta")
     alpha_series = pd.Series(filtered_state[1], index=pair.index, name="alpha")
 
-    # The innovations: y_t - predicted y_t given filter state at t-1.
-    # This is the dynamic spread.
     innovations = pd.Series(
         fit.filter_results.forecasts_error[0],
         index=pair.index,
@@ -130,6 +117,7 @@ def fit_kalman_pair(
 
 def adf_pvalue(series: pd.Series) -> float:
     from statsmodels.tsa.stattools import adfuller
+
     series = series.dropna()
     if len(series) < 30:
         return float("nan")
