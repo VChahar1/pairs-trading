@@ -1,10 +1,5 @@
-"""Tests for the Kalman filter module.
+"Tests for the Kalman filter module."
 
-We construct synthetic data with a known time-varying hedge ratio and
-verify that the filter recovers it. This is the right way to test
-statistical procedures: build inputs whose ground truth you control,
-and check that the procedure recovers it.
-"""
 from __future__ import annotations
 
 import numpy as np
@@ -21,20 +16,14 @@ def _construct_pair_with_drifting_beta(
     obs_noise: float = 0.01,
     seed: int = 0,
 ) -> pd.DataFrame:
-    """Construct a synthetic pair where beta drifts linearly from start to end.
-
-    log(Y_t) = beta_t * log(X_t) + alpha + noise
-    where beta_t goes from beta_start to beta_end linearly.
-    log(X_t) is a random walk.
-    """
+    "Construct a synthetic pair where beta drifts linearly from start to end."
     rng = np.random.default_rng(seed)
-    log_x = np.cumsum(rng.standard_normal(n)) * 0.02 + 4.0   # log(price) ~ 4
+    log_x = np.cumsum(rng.standard_normal(n)) * 0.02 + 4.0
     beta_t = np.linspace(beta_start, beta_end, n)
     alpha = -1.0
     noise = rng.standard_normal(n) * obs_noise
     log_y = beta_t * log_x + alpha + noise
 
-    # Convert log-prices back to prices for the API.
     return pd.DataFrame(
         {"A": np.exp(log_y), "B": np.exp(log_x)},
         index=pd.date_range("2020-01-01", periods=n, freq="B"),
@@ -49,18 +38,15 @@ def test_kalman_recovers_drifting_beta():
 
     result = fit_kalman_pair(prices, "A", "B")
 
-    # The filter has a warm-up period; check the second half of the series.
     half = len(result.beta_series) // 2
     beta_late = result.beta_series.iloc[half:]
 
-    # By the second half, beta should be roughly between 1.0 and 1.5.
     assert beta_late.mean() > 0.9, (
         f"Filter failed to track upward-drifting beta; "
         f"second-half mean was {beta_late.mean():.3f}"
     )
     assert beta_late.mean() < 1.5
 
-    # And the spread should be approximately stationary.
     spread_late = result.spread.iloc[half:]
     pvalue = adf_pvalue(spread_late)
     assert pvalue < 0.05, (
@@ -76,7 +62,6 @@ def test_kalman_static_pair():
 
     result = fit_kalman_pair(prices, "A", "B")
 
-    # After warm-up, beta should hover near 1.2.
     half = len(result.beta_series) // 2
     beta_late = result.beta_series.iloc[half:]
     assert abs(beta_late.mean() - 1.2) < 0.2, (

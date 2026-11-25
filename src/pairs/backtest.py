@@ -11,28 +11,29 @@ from .kalman import KalmanResult
 @dataclass
 class Trade:
     """A single completed round-trip trade."""
+
     pair: str
-    direction: int          
+    direction: int
     entry_date: pd.Timestamp
     exit_date: pd.Timestamp
     entry_spread: float
     exit_spread: float
     entry_beta: float
     n_bars_held: int
-    gross_pnl: float       
-    cost: float            
-    net_pnl: float         
+    gross_pnl: float
+    cost: float
+    net_pnl: float
 
 
 @dataclass
 class BacktestResult:
     """Aggregate results of a backtest on one pair."""
+
     pair: str
     trades: list[Trade] = field(default_factory=list)
-    daily_pnl: pd.Series | None = None    # mark-to-market daily P&L
+    daily_pnl: pd.Series | None = None
     burn_in_days: int = 252
 
-    # Aggregate stats — computed by summary()
     def summary(self) -> dict:
         if not self.trades:
             return {
@@ -49,13 +50,11 @@ class BacktestResult:
         gross = np.array([t.gross_pnl for t in self.trades])
         costs = np.array([t.cost for t in self.trades])
 
-        # Daily-P&L-based Sharpe (annualized).
         if self.daily_pnl is not None and self.daily_pnl.std() > 0:
             sharpe = (self.daily_pnl.mean() / self.daily_pnl.std()) * np.sqrt(252)
         else:
             sharpe = float("nan")
 
-        # Max drawdown on the cumulative P&L curve.
         if self.daily_pnl is not None:
             cum = self.daily_pnl.cumsum()
             running_max = cum.cummax()
@@ -84,8 +83,7 @@ def backtest_pair(
     cost_bps_per_leg: float = 10.0,
     burn_in_days: int = 252,
 ) -> BacktestResult:
-    """Run a backtest on one pair.
-    """
+    """Run a backtest on one pair."""
     y, x = kalman_result.y, kalman_result.x
     pair_name = f"{y}/{x}"
 
@@ -94,21 +92,18 @@ def backtest_pair(
     sigma_global = kalman_result.spread_std
 
     if sigma_global <= 0:
-        # Degenerate filter; no trades.
-        return BacktestResult(pair=pair_name, trades=[], daily_pnl=None,
-                              burn_in_days=burn_in_days)
+        return BacktestResult(
+            pair=pair_name, trades=[], daily_pnl=None, burn_in_days=burn_in_days
+        )
 
     rolling_sigma = spread.rolling(window=60, min_periods=30).std().shift(1)
     rolling_sigma = rolling_sigma.fillna(sigma_global)
 
-    # Cost as a fraction. Two legs per trade, entry + exit:
     cost_per_trade = 4.0 * (cost_bps_per_leg / 10000.0)
 
-    # Align price data with the spread series.
     pair_prices = prices[[y, x]].dropna().reindex(spread.index)
 
-    # Trading state machine.
-    position = 0           # +1 long-spread, -1 short-spread, 0 flat
+    position = 0
     entry_idx = None
     entry_spread_val = 0.0
     entry_beta_val = 0.0
@@ -132,63 +127,54 @@ def backtest_pair(
         py = pair_prices[y].iloc[i]
         px = pair_prices[x].iloc[i]
 
-        # Mark-to-market: if we have a position, compute its current P&L
-        # versus the entry. We accumulate this each day.
         if position != 0 and entry_idx is not None:
-            # Long-spread means we bought $1 of Y and shorted beta_entry * X (worth $beta_entry).
-            # MTM relative to entry, normalized to entry notional.
             ret_y = (py / entry_y_price) - 1.0
             ret_x = (px / entry_x_price) - 1.0
-            # Net P&L on $1-of-Y, $beta-of-X position (sign = position):
+
             mtm_pnl = position * (ret_y - entry_beta_val * ret_x)
-            # Daily *change* in mark-to-market: difference from prior day.
-            # We'll compute this by storing the cumulative mark each day.
+
             current_mark = realized_pnl_to_date + mtm_pnl
         else:
             current_mark = realized_pnl_to_date
 
-        # Decide what to do at the close of this bar.
         new_position = position
 
         if position == 0:
-            # Look for an entry.
             if s > entry_threshold:
-                new_position = -1   # short the spread (Y too expensive)
+                new_position = -1
             elif s < -entry_threshold:
-                new_position = +1   # long the spread (Y too cheap)
+                new_position = +1
         else:
-            # Look for an exit: spread has crossed zero relative to entry side.
             if position == +1 and s >= 0:
                 new_position = 0
             elif position == -1 and s <= 0:
                 new_position = 0
 
-        # If position is changing, record the trade.
         if new_position != position:
             if position != 0:
-                # Closing a position.
                 ret_y = (py / entry_y_price) - 1.0
                 ret_x = (px / entry_x_price) - 1.0
                 gross = position * (ret_y - entry_beta_val * ret_x)
                 net = gross - cost_per_trade
-                trades.append(Trade(
-                    pair=pair_name,
-                    direction=position,
-                    entry_date=spread.index[entry_idx],
-                    exit_date=date,
-                    entry_spread=entry_spread_val,
-                    exit_spread=float(s),
-                    entry_beta=entry_beta_val,
-                    n_bars_held=i - entry_idx,
-                    gross_pnl=float(gross),
-                    cost=float(cost_per_trade),
-                    net_pnl=float(net),
-                ))
+                trades.append(
+                    Trade(
+                        pair=pair_name,
+                        direction=position,
+                        entry_date=spread.index[entry_idx],
+                        exit_date=date,
+                        entry_spread=entry_spread_val,
+                        exit_spread=float(s),
+                        entry_beta=entry_beta_val,
+                        n_bars_held=i - entry_idx,
+                        gross_pnl=float(gross),
+                        cost=float(cost_per_trade),
+                        net_pnl=float(net),
+                    )
+                )
                 realized_pnl_to_date += net
                 current_mark = realized_pnl_to_date
 
             if new_position != 0:
-                # Opening a new position.
                 entry_idx = i
                 entry_spread_val = float(s)
                 entry_beta_val = float(b)
@@ -199,7 +185,6 @@ def backtest_pair(
 
         daily_pnl_records.append((date, current_mark))
 
-    # Force-close any open position at the end of the backtest.
     if position != 0 and entry_idx is not None:
         date = spread.index[-1]
         py = pair_prices[y].iloc[-1]
@@ -208,25 +193,25 @@ def backtest_pair(
         ret_x = (px / entry_x_price) - 1.0
         gross = position * (ret_y - entry_beta_val * ret_x)
         net = gross - cost_per_trade
-        trades.append(Trade(
-            pair=pair_name,
-            direction=position,
-            entry_date=spread.index[entry_idx],
-            exit_date=date,
-            entry_spread=entry_spread_val,
-            exit_spread=float(spread.iloc[-1]),
-            entry_beta=entry_beta_val,
-            n_bars_held=len(spread) - 1 - entry_idx,
-            gross_pnl=float(gross),
-            cost=float(cost_per_trade),
-            net_pnl=float(net),
-        ))
+        trades.append(
+            Trade(
+                pair=pair_name,
+                direction=position,
+                entry_date=spread.index[entry_idx],
+                exit_date=date,
+                entry_spread=entry_spread_val,
+                exit_spread=float(spread.iloc[-1]),
+                entry_beta=entry_beta_val,
+                n_bars_held=len(spread) - 1 - entry_idx,
+                gross_pnl=float(gross),
+                cost=float(cost_per_trade),
+                net_pnl=float(net),
+            )
+        )
         realized_pnl_to_date += net
-        # Update the last entry of daily_pnl_records.
+
         daily_pnl_records[-1] = (date, realized_pnl_to_date)
 
-    # Convert daily P&L records to a Series, then take first differences
-    # to get daily returns.
     cum_pnl = pd.Series(
         [r[1] for r in daily_pnl_records],
         index=[r[0] for r in daily_pnl_records],
