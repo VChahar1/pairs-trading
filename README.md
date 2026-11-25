@@ -40,7 +40,7 @@ Normalized P&L is not a fully specified investor capital return.
 
 ## What didn't work
 
-Cointegration and changing hedge ratios did not establish a tradable edge. Full-sample pair screening and noise estimation prevent a clean out-of-sample interpretation. The surviving-stock universe, same-close fills and fixed costs omit selection, borrowing and execution effects. Parameter choices need a separate evaluation period.
+Cointegration and changing hedge ratios did not establish a tradable edge. Notebook 02’s optional plot failed on an empty selected-pair table; its traceback is cleared and the cell remains unexecuted. Full-sample pair screening and noise estimation prevent a clean out-of-sample interpretation. The surviving-stock universe, same-close fills and fixed costs omit selection, borrowing and execution effects. Parameter choices need a separate evaluation period.
 
 ## Tests, structure and licence
 
