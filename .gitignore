@@ -19,3 +19,6 @@ data/cache/
 *.pem
 *.key
 *.pkl
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
